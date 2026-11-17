@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CardTestWindow</class>
+ <widget class="QWidget" name="CardTestWindow">
+  <property name="windowTitle"><string>GVFG 擷取卡測試</string></property>
+  <property name="minimumSize"><size><width>880</width><height>540</height></size></property>
+  <layout class="QVBoxLayout" name="pageLayout" stretch="0,0,0,1,0">
+   <property name="leftMargin"><number>20</number></property>
+   <property name="topMargin"><number>18</number></property>
+   <property name="rightMargin"><number>20</number></property>
+   <property name="bottomMargin"><number>16</number></property>
+   <property name="spacing"><number>12</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="titleLayout">
+     <item><widget class="QLabel" name="pageTitle">
+      <property name="text"><string>GVFG 擷取卡測試</string></property>
+      <property name="styleSheet"><string>font-size: 24px; font-weight: 600;</string></property>
+     </widget></item>
+     <item><spacer name="titleSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>20</width><height>1</height></size></property></spacer></item>
+     <item><widget class="QLabel" name="sdkVersionLabel"><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+     <item><widget class="QPushButton" name="reportsButton"><property name="text"><string>測試報告…</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QFrame" name="summaryFrame">
+     <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Maximum"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
+     <property name="styleSheet"><string>QFrame#summaryFrame { background: palette(alternate-base); border-radius: 10px; }</string></property>
+     <layout class="QVBoxLayout" name="summaryLayout">
+      <property name="leftMargin"><number>16</number></property>
+      <property name="topMargin"><number>8</number></property>
+      <property name="rightMargin"><number>16</number></property>
+      <property name="bottomMargin"><number>8</number></property>
+      <property name="spacing"><number>4</number></property>
+      <item><layout class="QHBoxLayout" name="statusRow">
+       <item alignment="Qt::AlignTop"><widget class="QLabel" name="statusLamp">
+        <property name="minimumSize"><size><width>12</width><height>12</height></size></property>
+        <property name="maximumSize"><size><width>12</width><height>12</height></size></property>
+       </widget></item>
+       <item><widget class="QLabel" name="statusLabel">
+       <property name="text"><string>準備就緒</string></property>
+       <property name="wordWrap"><bool>true</bool></property>
+       <property name="styleSheet"><string>font-size: 17px; font-weight: 600;</string></property>
+       </widget></item>
+      </layout></item>
+      <item><widget class="QLabel" name="selectionLabel"><property name="text"><string>已選 0 張卡</string></property></widget></item>
+      <item><widget class="QLabel" name="progressLabel"><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QProgressBar" name="roundProgress">
+       <property name="visible"><bool>false</bool></property>
+       <property name="format"><string>本輪進度 %v／%m</string></property>
+      </widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="actionsLayout">
+     <item><widget class="QPushButton" name="trialButton">
+      <property name="minimumHeight"><number>42</number></property>
+      <property name="text"><string>試跑 · 不關機</string></property>
+     </widget></item>
+     <item><widget class="QPushButton" name="runButton">
+      <property name="minimumHeight"><number>42</number></property>
+      <property name="text"><string>開始冷開機測試</string></property>
+      <property name="styleSheet"><string>QPushButton {background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600;} QPushButton:disabled {background: #cbd5e1; color: #64748b;}</string></property>
+     </widget></item>
+     <item><widget class="QPushButton" name="stopButton">
+      <property name="minimumHeight"><number>42</number></property>
+      <property name="text"><string>停止測試</string></property>
+      <property name="styleSheet"><string>QPushButton:enabled {color: #b52323; font-weight: 600;}</string></property>
+     </widget></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="workspaceSplitter">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <property name="childrenCollapsible"><bool>false</bool></property>
+     <widget class="QGroupBox" name="resultsPanel">
+      <property name="title"><string>本輪結果</string></property>
+      <layout class="QVBoxLayout" name="resultsLayout">
+       <item><widget class="QTableWidget" name="resultsTable">
+        <property name="alternatingRowColors"><bool>true</bool></property>
+        <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+        <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+        <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+        <column><property name="text"><string>擷取卡</string></property></column>
+        <column><property name="text"><string>通道</string></property></column>
+        <column><property name="text"><string>測項</string></property></column>
+        <column><property name="text"><string>結果</string></property></column>
+        <column><property name="text"><string>詳細資訊</string></property></column>
+       </widget></item>
+       <item><widget class="QLabel" name="diagnosticsLabel"><property name="text"><string>即時 SDK 紀錄</string></property></widget></item>
+       <item><widget class="QPlainTextEdit" name="diagnosticsLog">
+        <property name="readOnly"><bool>true</bool></property>
+        <property name="maximumBlockCount"><number>1000</number></property>
+        <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
+       </widget></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="settingsPanel">
+      <property name="minimumWidth"><number>350</number></property>
+      <layout class="QVBoxLayout" name="settingsLayout">
+       <property name="leftMargin"><number>4</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item><widget class="QGroupBox" name="selectionGroup">
+        <property name="title"><string>擷取卡與測項</string></property>
+        <layout class="QVBoxLayout" name="selectionLayout">
+         <item><layout class="QHBoxLayout" name="cardActions">
+          <item><widget class="QPushButton" name="refreshButton"><property name="text"><string>重新掃描</string></property></widget></item>
+          <item><widget class="QPushButton" name="copyButton"><property name="text"><string>套用到其他卡</string></property><property name="toolTip"><string>將目前選取卡片的測項勾選套用到其他卡片</string></property></widget></item>
+          <item><widget class="QPushButton" name="thresholdsButton"><property name="text"><string>測項設定…</string></property></widget></item>
+         </layout></item>
+         <item><widget class="QTreeWidget" name="cardTree">
+          <property name="alternatingRowColors"><bool>true</bool></property>
+          <property name="uniformRowHeights"><bool>true</bool></property>
+          <column><property name="text"><string>卡片／測項</string></property></column>
+          <column><property name="text"><string>CH0</string></property></column>
+          <column><property name="text"><string>CH1</string></property></column>
+         </widget></item>
+        </layout>
+       </widget></item>
+       <item><widget class="QGroupBox" name="cycleGroup">
+        <property name="title"><string>冷開機設定</string></property>
+        <layout class="QVBoxLayout" name="cycleLayout">
+         <item><layout class="QHBoxLayout" name="relayLayout">
+          <item><widget class="QLabel" name="roundLabel"><property name="text"><string>總輪數</string></property><property name="buddy"><cstring>roundsSpin</cstring></property></widget></item>
+          <item><widget class="QSpinBox" name="roundsSpin"><property name="minimum"><number>0</number></property><property name="maximum"><number>100000</number></property><property name="specialValueText"><string>不限</string></property><property name="suffix"><string> 輪</string></property></widget></item>
+          <item><spacer name="relaySpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>12</width><height>1</height></size></property></spacer></item>
+          <item><widget class="QPushButton" name="agentButton"><property name="text"><string>Relay Agent 連線設定…</string></property></widget></item>
+         </layout></item>
+         <item><widget class="QCheckBox" name="keepGoingCheck"><property name="text"><string>測項失敗仍繼續下一輪</string></property></widget></item>
+        </layout>
+       </widget></item>
+       <item><widget class="QGroupBox" name="startupGroup">
+        <property name="title"><string>登入後自動執行</string></property>
+        <layout class="QVBoxLayout" name="startupLayout">
+         <item><widget class="QLabel" name="startupStatus"><property name="wordWrap"><bool>true</bool></property></widget></item>
+         <item><layout class="QHBoxLayout" name="startupActions">
+          <item><widget class="QPushButton" name="installStartup"><property name="text"><string>安裝自動啟動</string></property></widget></item>
+          <item><widget class="QPushButton" name="removeStartup"><property name="text"><string>解除自動啟動</string></property></widget></item>
+         </layout></item>
+        </layout>
+       </widget></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item><widget class="QLabel" name="statisticsLabel"><property name="wordWrap"><bool>true</bool></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

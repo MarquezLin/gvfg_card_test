@@ -1,0 +1,6 @@
+/build/
+/build-*/
+/.qtcreator/
+/.package-*/
+/release/
+/runtime/gvfg.dll
