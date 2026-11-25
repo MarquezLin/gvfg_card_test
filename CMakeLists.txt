@@ -26,6 +26,7 @@ qt_add_executable(GVFG_CardTest WIN32
     "${sdk}/sdk/gvfg/src/gigabyte/gigabyte_device.cpp"
     reports_dialog.cpp
     session.cpp
+    card_startup_manager.cpp
     "${boot}/relay_agent.cpp"
     "${boot}/relay_controller.cpp"
 )
@@ -36,7 +37,7 @@ target_include_directories(GVFG_CardTest PRIVATE "${boot}" "${sdk}/sdk/gvfg/src"
     "${sdk}/third_party/GigabyteLib")
 target_compile_options(GVFG_CardTest PRIVATE /W4 /utf-8)
 target_compile_definitions(GVFG_CardTest PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(GVFG_CardTest PRIVATE Qt6::Widgets Qt6::Network gvfg setupapi advapi32)
+target_link_libraries(GVFG_CardTest PRIVATE Qt6::Widgets Qt6::Network gvfg setupapi advapi32 ole32 shell32 uuid)
 
 install(TARGETS GVFG_CardTest gvfg RUNTIME DESTINATION bin)
 install(FILES README.md DESTINATION .)

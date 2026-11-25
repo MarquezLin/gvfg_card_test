@@ -1,4 +1,5 @@
 #include "session.h"
+#include "card_startup_manager.h"
 #include <QCryptographicHash>
 
 #include <QCoreApplication>
@@ -39,59 +40,39 @@ QJsonObject loadJson(const QString &path)
 }
 
 namespace {
-const auto runKey = R"(HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run)";
-const auto startupName = "GVFG_CardTest";
-
-QString startupCommand()
+CardStartupManager startupManager()
 {
-    return '"' + QDir::toNativeSeparators(QCoreApplication::applicationFilePath()) + '"';
-}
-
-bool updateStartup(const QString &command, QString &error)
-{
-    QSettings run(runKey, QSettings::NativeFormat);
-    if (command.size() > 260) {
-        error = "程式路徑太長，Windows 啟動命令超過 260 字元";
-        return false;
-    }
-    if (command.isEmpty()) run.remove(startupName);
-    else run.setValue(startupName, command);
-    run.sync();
-    const bool ok = run.status() == QSettings::NoError
-        && (command.isEmpty() ? !run.contains(startupName) : run.value(startupName).toString() == command);
-    if (!ok) error = "無法更新目前使用者的 Windows 自動啟動設定";
-    return ok;
+    return CardStartupManager(std::filesystem::path(QCoreApplication::applicationFilePath().toStdWString()));
 }
 }
 
 bool setLoginStartup(bool enabled, QString &error)
 {
-    return updateStartup(enabled ? startupCommand() : QString(), error);
+    auto manager = startupManager();
+    std::wstring problem;
+    if (!(enabled ? manager.installStartup(problem) : manager.uninstallStartup(problem))) {
+        error = QString::fromStdWString(problem);
+        return false;
+    }
+    QSettings run(R"(HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run)", QSettings::NativeFormat);
+    run.remove("GVFG_CardTest");
+    run.sync();
+    if (run.status() != QSettings::NoError) {
+        error = "無法清除舊的 Run 自動啟動設定";
+        return false;
+    }
+    return true;
 }
 
 bool setResumeStartup(bool enabled, QString &error)
 {
-    QSettings run(runKey, QSettings::NativeFormat);
-    const auto existing = run.value(startupName).toString();
-    const auto command = startupCommand();
-    if (existing == command) return true;
-    if (!enabled && existing != command + " --resume") return true;
-    if (enabled && !existing.isEmpty() && existing != command + " --resume") {
-        error = "自動啟動路徑已變更，請按「安裝自動啟動」更新後重試。";
-        return false;
-    }
-    return updateStartup(enabled ? command + " --resume" : QString(), error);
+    // Keep the installed login shortcut after a test finishes, like boot_cycle_test.
+    return !enabled || setLoginStartup(true, error);
 }
 
 QString loginStartupStatus()
 {
-    QSettings run(runKey, QSettings::NativeFormat);
-    const auto existing = run.value(startupName).toString();
-    if (run.status() != QSettings::NoError) return "無法讀取 Windows 自動啟動設定";
-    if (existing.isEmpty()) return "尚未安裝";
-    if (existing == startupCommand()) return "已安裝，登入後開啟";
-    if (existing == startupCommand() + " --resume") return "已登記本次冷開機續跑";
-    return "程式路徑已變更，請重新安裝";
+    return QString::fromStdWString(startupManager().queryStartup().text);
 }
 
 RelaySettings relayFromConfig(const QJsonObject &config)

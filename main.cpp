@@ -2,6 +2,7 @@
 #include "gvfg_capture.h"
 #include "reports_dialog.h"
 #include "session.h"
+#include "card_startup_manager.h"
 #include "ui_card_test_window.h"
 
 #include <QApplication>
@@ -24,7 +25,6 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QLockFile>
 #include <QMessageBox>
 #include <QHostInfo>
 #include <QNetworkAccessManager>
@@ -48,10 +48,28 @@
 #include <QUuid>
 #include <functional>
 #include <memory>
+#include <windows.h>
 
 namespace {
 constexpr int identityRole = Qt::UserRole;
 constexpr int checkRole = Qt::UserRole + 1;
+
+void startupLog(const QString &root, const QString &message)
+{
+    if (root.isEmpty() || !QDir().mkpath(root)) return;
+    QFile file(QDir(root).filePath("startup.log"));
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        file.write((QDateTime::currentDateTime().toString(Qt::ISODateWithMs) + " · " + message + '\n').toUtf8());
+}
+
+QString loadedModulePath(const wchar_t *name)
+{
+    const auto module = GetModuleHandleW(name);
+    if (!module) return {};
+    wchar_t path[32768];
+    const DWORD length = GetModuleFileNameW(module, path, 32768);
+    return length && length < 32768 ? QString::fromWCharArray(path, int(length)) : QString();
+}
 
 QString roundName(int round)
 {
@@ -167,7 +185,17 @@ public:
                 item->parent()->setCheckState(0, Qt::Checked);
             updateSelection();
         });
-        restoreSession();
+        if (QCoreApplication::arguments().contains("--auto-run")) {
+            status->setText("登入後自動啟動，4 秒後讀取測試進度。");
+            waiting = true;
+            updateControls();
+            QTimer::singleShot(4000, this, [this] {
+                waiting = false;
+                restoreSession();
+            });
+        } else {
+            restoreSession();
+        }
         refreshStatistics();
         relayNetwork.setProxy(QNetworkProxy::NoProxy);
         auto *heartbeat = new QTimer(this);
@@ -607,6 +635,8 @@ private:
     void restoreSession()
     {
         session = loadJson(activeFile);
+        startupLog(root, QString("讀取進度 · phase=%1 · round=%2")
+            .arg(session.value("phase").toString()).arg(session.value("round").toInt()));
         if (session.isEmpty()) {
             updateControls();
             return;
@@ -666,17 +696,23 @@ private:
         const auto request = session.value("request").toString();
         struct Verification { QString state, error; };
         auto confirmation = std::make_shared<Verification>();
-        status->setText("正在向 Relay Agent 確認上次斷電排程，最多重試 60 秒。");
+        relayReconnecting = true;
+        status->setText("正在向 Relay Agent 確認上次斷電排程。");
         launch([this, relay, request, confirmation] {
-            QElapsedTimer retry;
-            retry.start();
-            while (!stop && retry.elapsed() < 60000) {
-                confirmation->state = relayAgentRequestState(relay, request, confirmation->error);
-                if (confirmation->state == "sent" || confirmation->state == "failed"
-                    || confirmation->state == "cancelled") return;
-                for (int tick = 0; tick < 10 && !stop; ++tick) QThread::msleep(100);
+            while (!stop) {
+                bool retryable = false;
+                confirmation->state = relayAgentRequestState(relay, request, confirmation->error, &retryable);
+                const bool pending = confirmation->state == "scheduled" || confirmation->state == "sending";
+                if (!retryable && !pending) return;
+                const auto message = retryable ? "等待 Relay Agent 重連：" + confirmation->error
+                    : QString("Relay Agent 正在處理上次斷電排程，等待確認。");
+                QMetaObject::invokeMethod(this, [this, message] {
+                    if (!stop) status->setText(message);
+                }, Qt::QueuedConnection);
+                for (int tick = 0; tick < 30 && !stop; ++tick) QThread::msleep(100);
             }
         }, [this, confirmation] {
+            relayReconnecting = false;
             if (confirmation->state == "sent") {
                 if (stop) finish("已停止，未開始下一輪。");
                 else runRound();
@@ -962,6 +998,7 @@ private:
             finish("無法保存冷開機續跑進度。");
             return;
         }
+        startupLog(root, QString("已保存第 %1 輪續跑進度 · 排程 %2").arg(round + 1).arg(request));
         status->setText("正在確認 Relay Agent，排程成功後將正常關機。");
         setLamp("#b45309");
         ui.progressLabel->clear();
@@ -1087,6 +1124,11 @@ int selfTest()
         || relayFromConfig({{"agent", "http://192.168.50.21:8080"}}).agentUrl != "http://192.168.50.21:8080")
         return 1;
     QTemporaryDir directory;
+    CardStartupManager startup(std::filesystem::path(QCoreApplication::applicationFilePath().toStdWString()),
+        std::filesystem::path(directory.path().toStdWString()));
+    std::wstring startupError;
+    if (!directory.isValid() || !startup.installStartup(startupError) || !startup.queryStartup().valid
+        || !startup.uninstallStartup(startupError) || startup.queryStartup().installed) return 1;
     const QJsonArray cards{QJsonObject{{"name", "測試卡"}, {"id", "missing-fixture-path"},
         {"ch0", QJsonArray{"open", "video"}}, {"ch1", QJsonArray{"audio"}}},
         QJsonObject{{"name", "測試卡"}, {"id", "second-missing-fixture-path"},
@@ -1122,6 +1164,14 @@ int main(int argc, char **argv)
     if (argc == 2 && QByteArray(argv[1]) == "--self-test") {
         QCoreApplication application(argc, argv);
         return selfTest();
+    }
+    const QString localAppData = qEnvironmentVariable("LOCALAPPDATA");
+    const QString earlyRoot = localAppData.isEmpty() ? QString() : localAppData + "/GVFG/GVFG_CardTest";
+    const bool autoRun = argc == 2 && (QByteArray(argv[1]) == "--auto-run" || QByteArray(argv[1]) == "--resume");
+    if (argc != 2 || QByteArray(argv[1]) != "--ui-self-test") {
+        startupLog(earlyRoot, QString("進入程式 · %1 · PID %2 · EXE %3 · MSVCP140 %4")
+            .arg(autoRun ? "登入啟動" : "一般啟動").arg(GetCurrentProcessId())
+            .arg(loadedModulePath(nullptr), loadedModulePath(L"msvcp140.dll")));
     }
     QApplication application(argc, argv);
     application.setApplicationName("GVFG_CardTest");
@@ -1192,13 +1242,20 @@ int main(int argc, char **argv)
         return application.exec();
     }
     const QString root = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    startupLog(root, "Qt 初始化完成");
     if (root.isEmpty() || !QDir().mkpath(root)) {
         QMessageBox::critical(nullptr, "GVFG 擷取卡測試", "無法建立本機測試資料夾。");
         return 1;
     }
-    QLockFile lock(root + "/instance.lock");
-    lock.setStaleLockTime(0);
-    if (!lock.tryLock()) return 1;
+    // Keep the named mutex alive for the lifetime of the main process.
+    const HANDLE handle = CreateMutexW(nullptr, TRUE, L"Local\\GVFG_CardTest");
+    const DWORD mutexError = GetLastError();
+    const std::unique_ptr<void, decltype(&CloseHandle)> instanceMutex(handle, CloseHandle);
+    if (!instanceMutex || mutexError == ERROR_ALREADY_EXISTS) {
+        startupLog(root, mutexError == ERROR_ALREADY_EXISTS ? QString("已有 CardTest 執行中")
+            : QString("無法建立執行鎖 · Windows 錯誤 %1").arg(mutexError));
+        return 1;
+    }
     if (application.arguments().contains("--resume")) {
         const auto phase = loadJson(root + "/active.json").value("phase").toString();
         if (phase.isEmpty() || phase == "finished") return 0;
@@ -1211,5 +1268,6 @@ int main(int argc, char **argv)
     }
     CardTestWindow window(root, reports);
     window.show();
+    startupLog(root, "主視窗已顯示");
     return application.exec();
 }
